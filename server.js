@@ -1,12 +1,16 @@
 import express from "express";
 import fetch from "node-fetch";
 import * as cheerio from "cheerio";
+import cors from "cors"; // <-- import cors
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Allow JSON input
 app.use(express.json());
+
+// Enable CORS for all origins (so your frontend can call it)
+app.use(cors());
 
 // Endpoint: /thingimage?url=<thingiverse_url>
 app.get("/thingimage", async (req, res) => {
