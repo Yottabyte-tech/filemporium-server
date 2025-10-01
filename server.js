@@ -49,6 +49,42 @@ app.get("/thingimage", async (req, res) => {
   }
 });
 
+// Endpoint: /downloads?url=<thingiverse_url>
+app.get("/downloads", async (req, res) => {
+  const { url } = req.query;
+
+  if (!url) {
+    return res.status(400).json({ error: "No URL provided" });
+  }
+
+  if (!url.includes("thingiverse.com/thing:")) {
+    return res.status(400).json({ error: "URL must be from Thingiverse" });
+  }
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error("Failed to fetch Thingiverse page");
+    }
+    const html = await response.text();
+    const $ = cheerio.load(html);
+
+    // Thingiverse shows downloads in meta[name="interactionCount"]
+    // e.g., <meta name="interactionCount" content="1234"/>
+    const downloadsMeta = $('meta[name="interactionCount"]').attr('content');
+    const downloads = downloadsMeta ? parseInt(downloadsMeta, 10) : null;
+
+    if (downloads === null) {
+      return res.status(404).json({ error: "Could not find download count" });
+    }
+
+    res.json({ downloads });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 // Root endpoint
 app.get("/", (req, res) => {
   res.send("Thingiverse Image API is running 🚀");
