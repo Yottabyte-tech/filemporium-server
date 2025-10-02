@@ -9,25 +9,25 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-/**
- * Unified endpoint: /scrape?url=<thingiverse_or_printables_url>
- */
 app.get("/scrape", async (req, res) => {
   const { url } = req.query;
   if (!url) return res.status(400).json({ error: "No URL provided" });
 
   try {
-    const response = await fetch(url);
+    // Add headers to mimic a real browser
+    const headers = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.5'
+    };
+
+    const response = await fetch(url, { headers, redirect: 'follow' });
     if (!response.ok) throw new Error("Failed to fetch page");
+
     const html = await response.text();
     const $ = cheerio.load(html);
 
-    let data = {
-      image: null,
-      title: null,
-      author: null,
-      site: null,
-    };
+    let data = { site: null, image: null, title: null, author: null };
 
     if (url.includes("thingiverse.com/thing:")) {
       data.site = "Thingiverse";
@@ -51,5 +51,4 @@ app.get("/scrape", async (req, res) => {
 
 app.get("/", (req, res) => res.send("3D Print Scraper API is running 🚀"));
 
-const server = app.listen(PORT, () => console.log(`Server running on ${PORT}`));
-server.maxHeadersCount = 5000; // 5000 headers
+app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
