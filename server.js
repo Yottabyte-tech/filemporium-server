@@ -50,7 +50,8 @@ app.get("/thingimage", async (req, res) => {
 });
 
 // Endpoint: /downloads?url=<thingiverse_url>
-app.get("/downloads", async (req, res) => {
+// Endpoint: /thinginfo?url=<thingiverse_url>
+app.get("/thinginfo", async (req, res) => {
   const { url } = req.query;
 
   if (!url) {
@@ -63,26 +64,29 @@ app.get("/downloads", async (req, res) => {
 
   try {
     const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error("Failed to fetch Thingiverse page");
-    }
+    if (!response.ok) throw new Error("Failed to fetch Thingiverse page");
     const html = await response.text();
     const $ = cheerio.load(html);
 
-    // Thingiverse shows downloads in meta[name="interactionCount"]
-    // e.g., <meta name="interactionCount" content="1234"/>
-    const downloadsMeta = $('meta[name="interactionCount"]').attr('content');
-    const downloads = downloadsMeta ? parseInt(downloadsMeta, 10) : null;
+    // Get OG image
+    const image = $('meta[property="og:image"]').attr("content") || null;
 
-    if (downloads === null) {
-      return res.status(404).json({ error: "Could not find download count" });
+    // Get title
+    const title = $('meta[property="og:title"]').attr("content") || $('title').text() || null;
+
+    // Get author
+    const author = $('meta[name="author"]').attr("content") || null;
+
+    if (!image && !title && !author) {
+      return res.status(404).json({ error: "No usable information found on Thingiverse page" });
     }
 
-    res.json({ downloads });
+    res.json({ image, title, author });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 
 // Root endpoint
