@@ -26,7 +26,6 @@ app.get("/scrape", async (req, res) => {
       image: null,
       title: null,
       author: null,
-      files: [],
       site: null,
     };
 
@@ -35,27 +34,11 @@ app.get("/scrape", async (req, res) => {
       data.image = $('meta[property="og:image"]').attr("content") || null;
       data.title = $('meta[property="og:title"]').attr("content") || $('title').text() || null;
       data.author = $('meta[name="author"]').attr("content") || null;
-      // Thingiverse files
-      $('a').each((i, el) => {
-        const href = $(el).attr('href');
-        if (href && href.includes('/download/')) {
-          const fullUrl = href.startsWith('http') ? href : `https://www.thingiverse.com${href}`;
-          data.files.push(fullUrl);
-        }
-      });
     } else if (url.includes("printables.com/")) {
       data.site = "Printables.com";
       data.image = $('meta[property="og:image"]').attr("content") || null;
       data.title = $('meta[property="og:title"]').attr("content") || $('title').text() || null;
       data.author = $('.creator-link').first().text().trim() || null;
-      // Printables files
-      $('a').each((i, el) => {
-        const href = $(el).attr('href');
-        if (href && (href.endsWith('.stl') || href.endsWith('.zip'))) {
-          const fullUrl = href.startsWith('http') ? href : `https://printables.com${href}`;
-          data.files.push(fullUrl);
-        }
-      });
     } else {
       return res.status(400).json({ error: "URL must be from Thingiverse or Printables.com" });
     }
@@ -66,7 +49,7 @@ app.get("/scrape", async (req, res) => {
   }
 });
 
-// Root endpoint
 app.get("/", (req, res) => res.send("3D Print Scraper API is running 🚀"));
 
-app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
+const server = app.listen(PORT, () => console.log(`Server running on ${PORT}`));
+server.maxHeadersCount = 5000; // 5000 headers
