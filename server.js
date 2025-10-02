@@ -1,54 +1,99 @@
 import express from "express";
 import fetch from "node-fetch";
 import * as cheerio from "cheerio";
-import cors from "cors";
+import cors from "cors"; // <-- import cors
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors());
+// Allow JSON input
 app.use(express.json());
 
-app.get("/scrape", async (req, res) => {
+// Enable CORS for all origins (so your frontend can call it)
+app.use(cors());
+
+// Endpoint: /thingimage?url=<thingiverse_url>
+app.get("/thingimage", async (req, res) => {
   const { url } = req.query;
-  if (!url) return res.status(400).json({ error: "No URL provided" });
+
+  if (!url) {
+    return res.status(400).json({ error: "No URL provided" });
+  }
+
+  // Only allow Thingiverse links
+  if (!url.includes("thingiverse.com/thing:")) {
+    return res.status(400).json({ error: "URL must be from Thingiverse" });
+  }
 
   try {
-    // Add headers to mimic a real browser
-    const headers = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-      'Accept-Language': 'en-US,en;q=0.5'
-    };
-
-    const response = await fetch(url, { headers, redirect: 'follow' });
-    if (!response.ok) throw new Error("Failed to fetch page");
-
+    // Fetch the page
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error("Failed to fetch Thingiverse page");
+    }
     const html = await response.text();
+
+    // Parse with Cheerio
     const $ = cheerio.load(html);
 
-    let data = { site: null, image: null, title: null, author: null };
+    // Find the OG:image meta tag (Thingiverse sets preview image here)
+    const imageUrl = $('meta[property="og:image"]').attr("content");
 
-    if (url.includes("thingiverse.com/thing:")) {
-      data.site = "Thingiverse";
-      data.image = $('meta[property="og:image"]').attr("content") || null;
-      data.title = $('meta[property="og:title"]').attr("content") || $('title').text() || null;
-      data.author = $('meta[name="author"]').attr("content") || null;
-    } else if (url.includes("printables.com/")) {
-      data.site = "Printables.com";
-      data.image = $('meta[property="og:image"]').attr("content") || null;
-      data.title = $('meta[property="og:title"]').attr("content") || $('title').text() || null;
-      data.author = $('.creator-link').first().text().trim() || null;
-    } else {
-      return res.status(400).json({ error: "URL must be from Thingiverse or Printables.com" });
+    if (!imageUrl) {
+      return res.status(404).json({ error: "No image found on Thingiverse page" });
     }
 
-    res.json(data);
+    res.json({ image: imageUrl });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.get("/", (req, res) => res.send("3D Print Scraper API is running 🚀"));
+// Endpoint: /downloads?url=<thingiverse_url>
+// Endpoint: /thinginfo?url=<thingiverse_url>
+app.get("/thinginfo", async (req, res) => {
+  const { url } = req.query;
 
-app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
+  if (!url) {
+    return res.status(400).json({ error: "No URL provided" });
+  }
+
+  if (!url.includes("thingiverse.com/thing:")) {
+    return res.status(400).json({ error: "URL must be from Thingiverse" });
+  }
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error("Failed to fetch Thingiverse page");
+    const html = await response.text();
+    const $ = cheerio.load(html);
+
+    // Get OG image
+    const image = $('meta[property="og:image"]').attr("content") || null;
+
+    // Get title
+    const title = $('meta[property="og:title"]').attr("content") || $('title').text() || null;
+
+    // Get author
+    const author = $('meta[name="author"]').attr("content") || null;
+
+    if (!image && !title && !author) {
+      return res.status(404).json({ error: "No usable information found on Thingiverse page" });
+    }
+
+    res.json({ image, title, author });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+
+// Root endpoint
+app.get("/", (req, res) => {
+  res.send("Thingiverse Image API is running 🚀");
+});
+
+app.listen(PORT, () => {
+  console.log(`Server listening on port ${PORT}`);
+});
